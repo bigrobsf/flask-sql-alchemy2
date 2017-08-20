@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+    <h1>Message Listing</h1>
+    <table>
+    <tr>
+        <th>User Name</th>
+        <th>Message</th>
+        <th>User</th>
+        <th>Message</th>
+    </tr>
+    {% for msg in msgs %}
+    <tr>
+        <td>{{ msg.user_name }}</td>
+        <td>{{ msg.message }}</td>
+        <td><a href="{{url_for('show', id=msg.user_id)}}">View User</a></td>
+        <td><a href="{{url_for('message_show', id=msg.user_id, msg_id=msg.id)}}">View Message</a></td>
+    </tr>
+    {% endfor %}
+    </table>
+{% endblock %}
