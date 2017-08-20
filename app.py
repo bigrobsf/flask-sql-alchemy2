@@ -10,6 +10,7 @@ db = SQLAlchemy(app)
 
 modus = Modus(app)
 
+
 class User(db.Model):
 
     __tablename__ = "users"
@@ -19,6 +20,7 @@ class User(db.Model):
     first_name = db.Column(db.Text)
     last_name = db.Column(db.Text)
     email = db.Column(db.Text, unique=True)
+    messages = db.relationship('Message', backref='user', lazy='dynamic')
 
     def __init__(self, user_name, first_name, last_name, email):
         self.user_name = user_name
@@ -29,6 +31,19 @@ class User(db.Model):
     def __repr__(self):
         return "Student {} {}'s user name is {}".format(self.first_name, self.last_name,
                                                         self.user_name)
+
+class Message(db.Model):
+
+    __tablename__ = "messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    message = db.Column(db.String(100))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    def __init__(self, message, user_id):
+        self.message = message
+        self.user_id = user_id
+
 
 @app.route('/')
 def root():
@@ -47,7 +62,7 @@ def index():
         db.session.commit()
 
         return redirect(url_for('index'))
-    return render_template('index.html', users=User.query.order_by(User.user_name).all())
+    return render_template('users/index.html', users=User.query.order_by(User.user_name).all())
 
 
 @app.route('/users/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
@@ -70,7 +85,7 @@ def show(id):
 
             return redirect(url_for('index'))
 
-        return render_template('show.html', user=found_user)
+        return render_template('users/show.html', user=found_user)
     else:
         return render_template('404.html')
 
@@ -79,14 +94,14 @@ def show(id):
 def edit(id):
     if id in [user.id for user in User.query.all()]:
         found_user = User.query.get(id)
-        return render_template('edit.html', user=found_user)
+        return render_template('users/edit.html', user=found_user)
     else:
         return render_template('404.html')
 
 
 @app.route('/users/new')
 def new():
-    return render_template('new.html')
+    return render_template('users/new.html')
 
 
 @app.errorhandler(404)
