@@ -20,7 +20,7 @@ class User(db.Model):
     first_name = db.Column(db.Text)
     last_name = db.Column(db.Text)
     email = db.Column(db.Text, unique=True)
-    messages = db.relationship('Message', backref='user', lazy='dynamic')
+    messages = db.relationship('Message', cascade="all, delete-orphan", backref='user', lazy='dynamic')
 
     def __init__(self, user_name, first_name, last_name, email):
         self.user_name = user_name
@@ -29,7 +29,7 @@ class User(db.Model):
         self.email = email
 
     def __repr__(self):
-        return "Student {} {}'s user name is {}".format(self.first_name, self.last_name,
+        return "User {} {}'s user name is {}".format(self.first_name, self.last_name,
                                                         self.user_name)
 
 class Message(db.Model):
@@ -70,36 +70,30 @@ def index():
 
 @app.route('/users/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
 def show(id):
-    if id in [user.id for user in User.query.all()]:
-        found_user = User.query.get(id)
-        if request.method == b'PATCH':
-            found_user.user_name = request.form.get('user_name')
-            found_user.first_name = request.form.get('first_name')
-            found_user.last_name = request.form.get('last_name')
-            found_user.email = request.form.get('email')
+    found_user = User.query.get_or_404(id)
+    if request.method == b'PATCH':
+        found_user.user_name = request.form.get('user_name')
+        found_user.first_name = request.form.get('first_name')
+        found_user.last_name = request.form.get('last_name')
+        found_user.email = request.form.get('email')
 
-            db.session.add(found_user)
-            db.session.commit()
-            return redirect(url_for('index'))
+        db.session.add(found_user)
+        db.session.commit()
+        return redirect(url_for('index'))
 
-        if request.method == b'DELETE':
-            db.session.delete(found_user)
-            db.session.commit()
+    if request.method == b'DELETE':
+        db.session.delete(found_user)
+        db.session.commit()
 
-            return redirect(url_for('index'))
+        return redirect(url_for('index'))
 
-        return render_template('users/show.html', user=found_user)
-    else:
-        return render_template('404.html')
+    return render_template('users/show.html', user=found_user)
 
 
 @app.route('/users/<int:id>/edit')
 def edit(id):
-    if id in [user.id for user in User.query.all()]:
-        found_user = User.query.get(id)
-        return render_template('users/edit.html', user=found_user)
-    else:
-        return render_template('404.html')
+    found_user = User.query.get_or_404(id)
+    return render_template('users/edit.html', user=found_user)
 
 
 @app.route('/users/new')
@@ -109,62 +103,52 @@ def new():
 # =============================================================================
 # routes for messages
 # =============================================================================
-@app.route('/users/<int:id>/messages', methods=['GET', 'POST'])
-def messages(id):
-    if id in [user.id for user in User.query.all()]:
-        if request.method == 'POST':
-            message = request.form.get('message')
-            user_id = id
+@app.route('/users/<int:user_id>/messages', methods=['GET', 'POST'])
+def message_index(user_id):
+    if request.method == 'POST':
+        message = request.form.get('message')
 
-            db.session.add(Message(message, user_id))
-            db.session.commit()
+        db.session.add(Message(message, user_id))
+        db.session.commit()
 
-            return redirect(url_for('index'))
-        else:  
-            message_list = db.session.query(User.user_name, Message.id, Message.message,
-                                            Message.user_id).join(Message, 
-                                            User.id == Message.user_id).filter(User.id == id)
-            print('STATEMENT: ', message_list.statement)
-            return render_template('messages/showall.html', msgs=message_list)
-    else:
-        return render_template('404.html')
+        return redirect(url_for('message_index', user_id=user_id))
+    else:  
+        user = User.query.get(user_id)
+        messages = user.messages.all()
+        info = [user, messages]
+
+        return render_template('messages/index.html', info=info)
 
 
-@app.route('/users/<int:id>/messages/show/<int:msg_id>', methods=['GET', 'PATCH', 'DELETE'])
-def message_show(id, msg_id):
-    if id in [user.id for user in User.query.all()] and msg_id in [message.id for message in Message.query.all()]:
-        found_message = Message.query.get(msg_id)
-        if request.method == b'PATCH':
-            found_message.message = request.form.get('message')
+@app.route('/users/<int:user_id>/messages/show/<int:msg_id>', methods=['GET', 'PATCH', 'DELETE'])
+def message_show(user_id, msg_id):
+    found_message = Message.query.get_or_404(msg_id)
+    if request.method == b'PATCH':
+        found_message.message = request.form.get('message')
 
-            db.session.add(found_message)
-            db.session.commit()
+        db.session.add(found_message)
+        db.session.commit()
 
-            return redirect(url_for('messages', id=id))
+        return redirect(url_for('message_index', user_id=user_id))
 
-        if request.method == b'DELETE':
-            db.session.delete(found_message)
-            db.session.commit()
+    if request.method == b'DELETE':
+        db.session.delete(found_message)
+        db.session.commit()
 
-            return redirect(url_for('messages', id=id))
+        return redirect(url_for('message_index', user_id=user_id))
 
-        return render_template('messages/show.html', msg=found_message)
-    else:
-        return render_template('404.html')
+    return render_template('messages/show.html', msg=found_message)
 
 
-@app.route('/users/<int:id>/messages/<int:msg_id>/edit')
-def message_edit(id, msg_id):
-    if id in [user.id for user in User.query.all()] and msg_id in [message.id for message in Message.query.all()]:
-        found_message = Message.query.get(msg_id)
-        return render_template('messages/edit.html', msg=found_message)
-    else:
-        return render_template('404.html')
+@app.route('/users/<int:user_id>/messages/<int:msg_id>/edit')
+def message_edit(user_id, msg_id):
+    found_message = Message.query.get_or_404(msg_id)
+    return render_template('messages/edit.html', msg=found_message)
 
 
-@app.route('/users/<int:id>/messages/new')
-def message_new(id):
-    return render_template('messages/new.html', user_id=id)
+@app.route('/users/<int:user_id>/messages/new')
+def message_new(user_id):
+    return render_template('messages/new.html', user_id=user_id)
 
 
 @app.errorhandler(404)
